@@ -9,9 +9,9 @@ import io
 import string
 
 # --- 1. CONFIG & AI FAILOVER ---
-API_KEY = "AIzaSyB94LyTAcWiKmOohM1wDOYgrtZeyvO9USY"
+API_KEY = "AIzaSyAv4KfyoEH0gWhUWkg0aQA-6svaPxoiwQU"
 genai.configure(api_key=API_KEY)
-MODELS = ["gemini-2.0-pro-exp", "gemini-2.0-flash-exp", "gemini-2.0-pro-exp", "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"]
+MODELS = ["gemini-2.5-pro-exp", "gemini-2.5-flash-exp", "gemini-2.0-pro-exp", "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"]
 
 def get_ai_analysis(mode, age, symptoms, history=""):
     if mode == "Homeopathic":
