@@ -10,7 +10,7 @@ import string
 # --- 1. REPAIRED AI-BRAIN LOGIC ---
 API_KEY = "AIzaSyB94LyTAcWiKmOohM1wDOYgrtZeyvO9USY"
 genai.configure(api_key=API_KEY)
-MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-pro-exp", "gemini-1.5-pro", "gemini-1.5-flash"]
+MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-pro", "gemini-2.0-flash"]
 
 def get_clinical_analysis(mode, age, symptoms, history=""):
     """
