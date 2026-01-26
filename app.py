@@ -1,139 +1,126 @@
 import streamlit as st
 import pandas as pd
+import google.generativeai as genai
 from datetime import datetime
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+import io
 
-# --- 1. THE TWIN BRAINS (LOGIC ENGINES) ---
+# --- 1. CONFIG & AI FAILOVER ---
+API_KEY = "AIzaSyB94LyTAcWiKmOohM1wDOYgrtZeyvO9USY"
+genai.configure(api_key=API_KEY)
+MODELSTO TRY = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-pro", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
 
-def suggest_allopathic(text):
-    """Brain for Modern Medicine"""
-    s = text.lower()
-    if any(x in s for x in ["back", "joint", "stiffness", "pain", "extremities"]):
-        return {
-            "diag": "Generalized Arthralgia / Spondylosis",
-            "rx": "1. TAB. ETORICOXIB 90mg | 0--0--1 (After Food) | 5 Days\n2. TAB. THIOCOLCHICOSIDE 4mg | 1--0--1 (After Food) | 5 Days\n3. TAB. CALCIUM + VIT D3 | 0--1--0 | 15 Days"
-        }
-    elif any(x in s for x in ["fever", "chill", "cold", "body ache"]):
-        return {
-            "diag": "Acute Viral Syndrome",
-            "rx": "1. TAB. PARACETAMOL 650mg | 1--1--1 (SOS) | 3 Days\n2. TAB. LEVOCETIRIZINE 5mg | 0--0--1 (HS) | 3 Days"
-        }
-    elif any(x in s for x in ["acidity", "burning", "nausea", "vomiting"]):
-        return {
-            "diag": "Acute Gastritis / GERD",
-            "rx": "1. CAP. PANTOPRAZOLE 40mg | 1--0--0 (Empty Stomach) | 5 Days\n2. SYP. SUCRALFATE | 2 tsp TDS | 5 Days"
-        }
-    else:
-        return {"diag": "", "rx": ""}
+def get_ai_analysis(mode, p_info, symptoms, history=""):
+    prompt = f"Doctor Analysis Case: Age/Sex {p_info['age']}, Symptoms: {symptoms}. Mode: {mode}. Format: |DIAGNOSIS|...|REMEDY/RX|..."
+    for m_name in MODELS:
+        try:
+            model = genai.GenerativeModel(m_name)
+            response = model.generate_content(prompt)
+            return response.text, m_name
+        except: continue
+    return "|DIAGNOSIS| Manual Review |REMEDY| Placebo |", "LOCAL_FAILOVER"
 
-def suggest_homeopathic(text):
-    """Brain for Homeopathy"""
-    s = text.lower()
-    # Logic for Patient A2 (Saurabh Gupta)
-    if "stiffness" in s and ("morning" in s or "cold" in s):
-        return {
-            "diag": "Rheumatic Affection",
-            "rx": "|REMEDY| Rhus Toxicodendron |\n|POTENCY| 200C |\n|REPETITION| TDS (Thrice Daily) |\n|DURATION| 7 Days |"
-        }
-    # Logic for Patient A1 (Shreya Naidu)
-    elif "fever" in s and ("chill" in s or "restless" in s):
-        return {
-            "diag": "Viral Pyrexia",
-            "rx": "|REMEDY| Arsenicum Album |\n|POTENCY| 30C |\n|REPETITION| Every 2 Hours |\n|DURATION| 2 Days |"
-        }
-    elif "injury" in s or "fall" in s or "trauma" in s:
-        return {
-            "diag": "Trauma / Contusion",
-            "rx": "|REMEDY| Arnica Montana |\n|POTENCY| 200C |\n|REPETITION| BD (Twice Daily) |\n|DURATION| 5 Days |"
-        }
-    else:
-        return {"diag": "Constitutional Analysis Req.", "rx": "|REMEDY|  |\n|POTENCY|  |\n|REPETITION|  |"}
+# --- 2. PDF ENGINE (RX-NAME-DATE) ---
+def create_pdf(slip_content):
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=(80*mm, 200*mm))
+    p.setFont("Helvetica", 9)
+    y = 190 * mm
+    for line in slip_content.split('\n'):
+        p.drawString(5*mm, y, line)
+        y -= 5*mm
+    p.showPage()
+    p.save()
+    return buffer.getvalue()
 
-# --- 2. SECURITY ---
-def check_password():
-    if "password_correct" not in st.session_state:
-        st.sidebar.text_input("🔑 Enter Password", type="password", key="password_input", on_change=verify_pass)
-        return False
-    return st.session_state["password_correct"]
+# --- 3. DATA & ANALYTICS PERSISTENCE ---
+if 'db' not in st.session_state: st.session_state.db = []
+if 'form_state' not in st.session_state: st.session_state.form_state = {}
 
-def verify_pass():
-    if st.session_state["password_input"] == "Clinic@47553":
-        st.session_state["password_correct"] = True
-    else:
-        st.sidebar.error("Incorrect Password")
+# --- 4. BRANDING ---
+CLINIC = "SHRI SWAMI SAMARTH HOMEOPATHIC CLINIC AND HOSPITAL"
+DR_INFO = "DR. SUDHANSHU GUPTA (B.H.M.S., M.D., REG: 47553)"
 
-# --- 3. MAIN APP ---
-if check_password():
-    # Clinic Constants
-    CLINIC_NAME = "SHRI SWAMI SAMARTH HOMEOPATHIC CLINIC AND HOSPITAL"
-    ADDRESS = "BHOSLEWADI BUS STOP, MHGAON ROAD, HINGNA-440011."
-    DOCTOR = "DR. SUDHANSHU GUPTA (REG.NO. 47553)"
-    QUALIFICATIONS = "B.H.M.S., P.G.D.C.P., M.D. (HOLISTIC MEDICINE), P.G.D.C.F.L"
-    
-    if 'db' not in st.session_state: st.session_state.db = []
+st.set_page_config(page_title="Clinic Pro v11", layout="wide")
 
-    # --- SIDEBAR: RECORDS ---
-    st.sidebar.title("📂 Records")
-    if st.sidebar.button("📥 Export CSV"):
-        df = pd.DataFrame(st.session_state.db)
-        st.sidebar.download_button("Click to Save", df.to_csv(index=False).encode('utf-8'), "OPD_Data.csv")
-    
-    # --- MAIN INTERFACE ---
-    st.title("🏥 Smart Hybrid OPD")
-    
-    # A. MODE SWITCHING (Restored!)
-    mode = st.radio("Select Protocol Mode:", ["Allopathic (Acute)", "Homeopathic (Constitutional)"], horizontal=True)
-    
-    # B. Patient Info
-    with st.expander("Patient Details & Vitals", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        p_id = c1.text_input("ID", value=f"A{len(st.session_state.db)+1}")
-        name = c2.text_input("Name")
-        age = c3.text_input("Age/Sex", "28/F")
-        bp = c1.text_input("BP", "120/80")
-        weight = c2.text_input("Weight", "60")
-        pulse = c3.text_input("Pulse", "80")
+# --- 5. SIDEBAR: DATA, SEARCH & ANALYTICS ---
+st.sidebar.title("🏥 Clinic Management")
 
-    # C. Active Analysis
-    st.subheader("Clinical Brain")
-    symptoms = st.text_area("Type Symptoms (e.g. 'Stiffness worse in morning')", height=80)
-    
-    if st.button("⚡ AUTO-ANALYZE CASE"):
-        if mode == "Allopathic (Acute)":
-            result = suggest_allopathic(symptoms)
-        else:
-            result = suggest_homeopathic(symptoms)
-            
-        st.session_state['auto_diag'] = result['diag']
-        st.session_state['auto_rx'] = result['rx']
-        st.success(f"Generated {mode} Protocol!")
+# A. SEARCH & FOLLOW-UP
+search = st.sidebar.text_input("🔍 Search Patient Name")
+if search:
+    res = [r for r in st.session_state.db if search.lower() in r['Name'].lower()]
+    for r in reversed(res):
+        if st.sidebar.button(f"📅 {r['Date']} - {r['Name']}", key=f"hist_{r['ID']}{r['Date']}"):
+            st.session_state.form_state = r
+    if st.sidebar.button("➕ START FOLLOW-UP"):
+        last = res[-1]
+        st.session_state.form_state = {"ID": last['ID'], "Name": last['Name'], "Age": last['Age'], "Old_S": last['Symptoms']}
 
-    # D. Final Review (Editable)
+st.sidebar.divider()
+
+# B. IMPORT / EXPORT (NO OMISSION)
+st.sidebar.subheader("💾 Data Security")
+if st.session_state.db:
+    csv = pd.DataFrame(st.session_state.db).to_csv(index=False).encode('utf-8')
+    st.sidebar.download_button("📥 Export Clinic DB", csv, f"Clinic_Backup_{datetime.now().strftime('%d%m%Y')}.csv")
+
+uploaded_file = st.sidebar.file_uploader("📤 Import Clinic DB", type="csv")
+if uploaded_file:
+    st.session_state.db = pd.read_csv(uploaded_file).to_dict('records')
+    st.sidebar.success("Database Loaded!")
+
+# --- 6. MAIN INTERFACE ---
+tab_opd, tab_stats = st.tabs(["📋 Consultation", "📊 Clinical Analytics"])
+
+with tab_opd:
+    st.header("Patient Consultation")
+    c1, c2, c3 = st.columns(3)
+    p_id = c1.text_input("ID", value=st.session_state.form_state.get("ID", f"A{len(st.session_state.db)+1}"))
+    p_name = c2.text_input("Name", value=st.session_state.form_state.get("Name", ""))
+    p_age = c3.text_input("Age/Sex", value=st.session_state.form_state.get("Age", ""))
+
+    if "Old_S" in st.session_state.form_state:
+        st.warning(f"📌 LAST COMPLAINTS: {st.session_state.form_state['Old_S']}")
+
+    p_symp = st.text_area("Present Symptoms", value="")
+    mode = st.radio("Mode", ["Homeopathic", "Allopathic"], horizontal=True)
+
+    if st.button("🧠 AI ANALYSIS (Multi-Model)"):
+        with st.spinner("Cycling through Gemini 2.0/1.5 failover..."):
+            ans, model_used = get_ai_analysis(mode, {"age": p_age}, p_symp)
+            st.session_state['current_rx'] = ans
+            st.toast(f"Analyzed using {model_used}")
+
     st.divider()
-    final_diag = st.text_input("Diagnosis", value=st.session_state.get('auto_diag', ""))
-    final_rx = st.text_area("Rx / Remedy Plan", value=st.session_state.get('auto_rx', ""), height=200)
+    # EDITABLE BOX
+    f_rx = st.text_area("Final Prescription (Editable)", value=st.session_state.get('current_rx', ""), height=200)
+    f_diag = st.text_input("Diagnosis", value=f_rx.split("|DIAGNOSIS|")[-1].split("|")[0] if "|DIAGNOSIS|" in f_rx else "")
 
-    # E. Print Slip
-    if st.button("🖨️ Generate Thermal Slip"):
-        # Save to History
-        st.session_state.db.append({"ID": p_id, "Name": name, "Diag": final_diag, "Date": datetime.now().strftime("%Y-%m-%d")})
+    if st.button("💾 SAVE & PRINT PDF"):
+        timestamp = datetime.now().strftime("%d%m%Y")
+        fname = f"RX-{p_name.replace(' ','').upper()}-{timestamp}.pdf"
         
-        # Format Slip
-        slip = f"""
-{CLINIC_NAME}
-{ADDRESS}
+        # Log to Database
+        st.session_state.db.append({
+            "ID": p_id, "Name": p_name, "Age": p_age, "Symptoms": p_symp, 
+            "Diagnosis": f_diag, "Rx": f_rx, "Date": datetime.now().strftime("%Y-%m-%d")
+        })
+        
+        # PDF Content
+        content = f"{CLINIC}\n{DR_INFO}\n" + "="*20 + f"\nID: {p_id} | {p_name}\nDx: {f_diag}\n" + "-"*20 + f"\nRx:\n{f_rx}\n" + "="*20
+        pdf_data = create_pdf(content)
+        st.download_button(f"📥 Download {fname}", data=pdf_data, file_name=fname)
 
-{DOCTOR}
-{QUALIFICATIONS}
-------------------------------
-ID: {p_id} | Name: {name.upper()}
-Age/Sex: {age} | Weight: {weight}kg
-BP: {bp} | Pulse: {pulse}
-------------------------------
-DIAGNOSIS: {final_diag}
-
-RX ({'ALLOPATHIC' if mode == 'Allopathic (Acute)' else 'HOMEOPATHIC'}):
-{final_rx}
-------------------------------
-SIGNATURE: DR. SUDHANSHU GUPTA
-"""
-        st.text_area("Ready for Print", slip, height=400)
+with tab_stats:
+    st.header("Clinic Statistics")
+    if st.session_state.db:
+        df = pd.DataFrame(st.session_state.db)
+        st.subheader("Top Diagnoses")
+        st.bar_chart(df['Diagnosis'].value_counts())
+        st.subheader("Recent Visits")
+        st.table(df[['Date', 'ID', 'Name', 'Diagnosis']].tail(10))
+    else:
+        st.info("No data available for analytics yet.")
