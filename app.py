@@ -18,7 +18,7 @@ TAGLINE = "CONSULTANT HOMEOPATH AND PSYCHOTHERAPIST"
 API_KEY = "AIzaSyB94LyTAcWiKmOohM1wDOYgrtZeyvO9USY"
 genai.configure(api_key=API_KEY)
 # 5-Layer Failover Architecture
-MODELS = ["gemini-2.5-flash", "gemini-2.0-pro-exp", "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-1.5-flash"]
+MODELS = ["gemini-2.5-flash", "gemini-2.0-pro", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
 
 # --- 2. CORE UTILITIES (ID, PDF, OFFLINE LOGIC) ---
 
