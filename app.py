@@ -14,7 +14,7 @@ DR_QUAL = "B.H.M.S., P.G.D.C.P., M.D.(HOLISTIC MEDICINE), P.G.D.C.F.L., REG.NO-4
 TAGLINE = "CONSULTANT HOMEOPATH AND PSYCHOTHERAPIST"
 
 # --- 2. AI CONFIGURATION & MODELS ---
-API_KEY = "AIzaSyB94LyTAcWiKmOohM1wDOYgrtZeyvO9USY"
+API_KEY = "AIzaSyAwnRH3xrb6Oa5s6fOKgeCS5GxK9MT1fW4"
 genai.configure(api_key=API_KEY)
 MODELS = ["gemini-2.5-flash", "gemini-2.0-pro-exp", "gemini-1.5-pro"]
 
